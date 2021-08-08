@@ -6,10 +6,10 @@
 #include <fstream>
 
 int main() {
-    TransportCatalogue tc;
-    ifstream in("C:\\Users\\Anna\\source\\repos\\Transport\\Transport\\text.txt");
-    ofstream out("test.txt");
-    FillCatalogue(tc, in);
-    OutpuInfo(tc, in, cout);
+    transport_catalogue::TransportCatalogue tc;
+    std::ifstream in("C:\\Users\\Anna\\Source\\Repos\\TransportCatalogue\\test.txt");
+    std::ofstream out("test.txt");
+    input::FillCatalogue(tc, in);
+    output::OutpuInfo(tc, in, std::cout);
     return 0;
 }
