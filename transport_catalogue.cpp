@@ -10,12 +10,13 @@ void TransportCatalogue::AddStop(std::string_view stop, const double lat, const 
 	stop_to_buses_[stops_.at(stop).name];
 }
 
-void TransportCatalogue::AddBus(std::string_view bus, std::vector<std::string_view> stops)
+void TransportCatalogue::AddBus(std::string_view bus, std::vector<std::string_view> stops, bool is_round)
 {
-	Bus b = { std::string(bus), {}};
+	Bus b = { std::string(bus), {} };
 	for (auto& s : stops) {
-		b.b_stops.push_back(FindStop(s)); 
+		b.b_stops.push_back(FindStop(s));
 	}
+	b.round = is_round;
 	buses_.emplace(bus, std::move(b));
 	auto correct_name = buses_.extract(std::string(bus));
 	correct_name.key() = correct_name.mapped().B_name;
@@ -23,6 +24,24 @@ void TransportCatalogue::AddBus(std::string_view bus, std::vector<std::string_vi
 	for (auto s : stops) {
 		stop_to_buses_[FindStop(s).name].insert(FindBus(bus).B_name);
 	}
+}
+
+void TransportCatalogue::AddLenth(const std::string_view bus) {
+	double geographical_length = 0.0;
+	auto it1 = buses_.at(bus).b_stops.begin();
+	auto it1_end = buses_.at(bus).b_stops.end();
+	auto it2 = it1++;
+	for (auto it = it1; it != it1_end; ++it, ++it2) {
+		geographical_length += distance::ComputeDistance(it2->coordinates, it->coordinates);
+	}
+	it1 = buses_.at(bus).b_stops.begin();
+	it1_end = buses_.at(bus).b_stops.end();
+	it2 = it1++;
+	buses_[bus].length_ = 0;
+	for (auto it = it1; it != it1_end; ++it, ++it2) {
+		buses_[bus].length_ += GetDistances(it2->name, it->name);
+	}
+	buses_[bus].curvature_ = buses_[bus].length_ / geographical_length;
 }
 
 void TransportCatalogue::AddDistances(const std::string_view stop1, const std::string_view stop2, const int distance)
@@ -61,54 +80,49 @@ void TransportCatalogue::AddDistances(const std::string_view stop1, const std::s
 	}
 }
 
-[[nodiscard]] BInfo TransportCatalogue::BusInfo(const std::string_view bus) const noexcept
+void transport_catalogue::TransportCatalogue::GetBuses(std::vector<Bus>& answer) const
+{
+	for (auto f : buses_) {
+		answer.push_back(f.second);
+	}
+}
+void transport_catalogue::TransportCatalogue::GetStops(std::vector<Stop>& answer) const
+{
+	for (auto f : stops_) {
+		answer.push_back(f.second);
+	}
+}
+[[nodiscard]] BusInfo TransportCatalogue::GetBusInfo(const std::string_view bus) const noexcept
 {
 	if (buses_.count(bus) == 0) {
-		return BInfo();
+		return BusInfo();
 	}
-	BInfo i = { true, buses_.at(bus).b_stops.size(), 0, 0, 0.0 };
+	BusInfo i = { true, static_cast<int>(buses_.at(bus).b_stops.size()), 0, 0, 0.0 };
 	std::unordered_set<std::string_view> uniq;
 	for (auto& st : buses_.at(bus).b_stops) {
 		uniq.emplace(st.name);
 	}
-	i.uniq_stops = uniq.size();
+	i.uniq_stops = static_cast<int>(uniq.size());
 	const Bus& b = buses_.at(bus);
-	auto get_geographical_distance = [](const Stop stop2, const Stop stop1) {
-		return distance::ComputeDistance(stop1.coordinates, stop2.coordinates);
-	};
-
-	double geographical_length = std::transform_reduce(++std::begin(b.b_stops), std::end(b.b_stops),
-		std::begin(b.b_stops), 0.0, std::plus<>{}, get_geographical_distance
-	);
-
-	auto get_length = [this](const Stop stop2, const Stop stop1) {
-		return GetDistances(stop1.name, stop2.name);
-	};
-
-	i.length = std::transform_reduce(std::execution::par, ++std::begin(b.b_stops), std::end(b.b_stops),
-		std::begin(b.b_stops), 0, std::plus<>{}, get_length
-	);
-
-	i.curvature = i.length / geographical_length;
+	i.curvature = b.curvature_;
+	i.length = b.length_;
 	return i;
 }
 
-SInfo TransportCatalogue::StopInfo(const std::string_view stop) const noexcept
+
+StopInfo TransportCatalogue::GetStopInfo(const std::string_view stop) const noexcept
 {
 	if (stop_to_buses_.count(stop) == 0) {
-		return SInfo();
+		return StopInfo();
 	}
-	SInfo si;
+	StopInfo si;
 	if (stop_to_buses_.at(stop).size() == 0) {
 		si.about = "no buses";
 	}
 	else {
 		si.about = "Ok";
-		for (auto bus : stop_to_buses_.at(stop)) {
-			si.stopbuses_.push_back(bus);
-		}
-		sort(si.stopbuses_.begin(), si.stopbuses_.end());
+		si.stop_buses_ = stop_to_buses_.at(stop);
 	}
-	return SInfo(si);
+	return StopInfo(si);
 }
 
