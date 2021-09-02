@@ -1,64 +1,72 @@
 #pragma once
+#include "domain.h"
 #include "svg.h"
-#include "geo.h"
-static const double EPSILON = 1e-6;
-static bool IsZero(double value) {
-    return std::abs(value) < EPSILON;
-}
 
-class SphereProjector {
-public:
-    template <typename PointInputIt>
-    SphereProjector(PointInputIt points_begin, PointInputIt points_end, double max_width,
-        double max_height, double padding)
-        : padding_(padding) {
-        if (points_begin == points_end) {
-            return;
-        }
+#include <cassert>
+#include <map>
+namespace transport_catalogue {
 
-        const auto [left_it, right_it]
-            = std::minmax_element(points_begin, points_end, [](auto lhs, auto rhs) {
-            return lhs.lng < rhs.lng;
-                });
-        min_lon_ = left_it->lng;
-        const double max_lon = right_it->lng;
+    namespace renderer {
 
-        const auto [bottom_it, top_it]
-            = std::minmax_element(points_begin, points_end, [](auto lhs, auto rhs) {
-            return lhs.lat < rhs.lat;
-                });
-        const double min_lat = bottom_it->lat;
-        max_lat_ = top_it->lat;
+        struct RenderSettings {
+            std::vector<svg::Color> palette;
+            double max_width;
+            double max_height;
+            double padding;
+            double line_width;
+            double stop_radius;
+            svg::Color underlayer_color{ std::string("white") };
+            double underlayer_width;
+            svg::Point stop_label_offset;
+            uint32_t stop_label_font_size;
+            svg::Color stop_label_color{ std::string("black") };
+            std::string stop_label_font_family{ "Verdana" };
+            svg::Point bus_label_offset;
+            uint32_t bus_label_font_size;
+            std::string bus_label_font_family{ "Verdana" };
+        };
 
-        std::optional<double> width_zoom;
-        if (!IsZero(max_lon - min_lon_)) {
-            width_zoom = (max_width - 2 * padding) / (max_lon - min_lon_);
-        }
+        class MapView : public svg::Drawable {
+        public:
+            MapView(RenderSettings render_settings, std::vector<Bus> buses);
 
-        std::optional<double> height_zoom;
-        if (!IsZero(max_lat_ - min_lat)) {
-            height_zoom = (max_height - 2 * padding) / (max_lat_ - min_lat);
-        }
+            void Draw(svg::ObjectContainer& container) const override;
 
-        if (width_zoom && height_zoom) {
-            zoom_coeff_ = std::min(*width_zoom, *height_zoom);
-        }
-        else if (width_zoom) {
-            zoom_coeff_ = *width_zoom;
-        }
-        else if (height_zoom) {
-            zoom_coeff_ = *height_zoom;
-        }
-    }
+        private:
+            void DrawRoutes(svg::ObjectContainer& container) const;
+            void DrawRoutesNames(svg::ObjectContainer& container) const;
+            void DrawStopCitcles(svg::ObjectContainer& container) const;
+            void DrawStopsNames(svg::ObjectContainer& container) const;
+            const svg::Color& GetBusLineColor(size_t index) const;
 
-    svg::Point operator()(distance::Coordinates coords) const {
-        return { (coords.lng - min_lon_) * zoom_coeff_ + padding_,
-                (max_lat_ - coords.lat) * zoom_coeff_ + padding_ };
-    }
+            struct SortStops {
+                bool operator()(Stop lhs, Stop rhs) const {
+                    return lhs.name < rhs.name;
+                }
+            };
+            RenderSettings render_settings_;
+            std::vector<Bus> buses_;
+            std::map<Stop, svg::Point, SortStops> stops_coords_;
+        };
 
-private:
-    double padding_;
-    double min_lon_ = 0;
-    double max_lat_ = 0;
-    double zoom_coeff_ = 0;
-};
+        class MapRenderer {
+        public:
+            MapRenderer() = default;
+            MapRenderer(RenderSettings settings);
+
+            template <typename It>
+            MapView RenderMap(It begin, It end) const {
+                std::vector<Bus> buses;
+                for (; begin != end; ++begin) {
+                    buses.emplace_back(*begin);
+                }
+                return { render_settings_, std::move(buses) };
+            }
+
+        private:
+            RenderSettings render_settings_;
+        };
+
+    }  // namespace renderer
+
+}  // namespace transport_catalogue

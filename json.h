@@ -1,277 +1,138 @@
 #pragma once
 
 #include <iostream>
-#include <sstream>
 #include <map>
 #include <string>
-#include <vector>
 #include <variant>
-#include <stdexcept>
-#include <iomanip>
-#include <regex>
+#include <vector>
 
 namespace json {
-    using namespace std::literals;
 
     class Node;
-
-    using Number = std::variant<int, double>;
-    using Array = std::vector<Node>;
     using Dict = std::map<std::string, Node>;
+    using Array = std::vector<Node>;
 
-    // Эта ошибка должна выбрасываться при ошибках парсинга JSON
     class ParsingError : public std::runtime_error {
     public:
         using runtime_error::runtime_error;
     };
 
-    class Node {
+    class Node final
+        : private std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string> {
     public:
-        Node() = default;
-
-        template<typename T>
-        Node(T node) : node_(std::move(node)) {}
-
-        bool operator==(const Node& other) const {
-            return node_ == other.node_;
-        }
-
-        bool operator!=(const Node& other) const {
-            return !(*this == other);
-        }
+        using variant::variant;
 
         bool IsInt() const {
-            try {
-                int var = std::get<int>(node_);
-                (void)&var;
-                return true;
-            }
-            catch (std::bad_variant_access&) {
-                return false;
-            }
+            return std::holds_alternative<int>(*this);
         }
-
         int AsInt() const {
-            try {
-                return std::get<int>(node_);
+            using namespace std::literals;
+            if (!IsInt()) {
+                throw std::logic_error("Not an int"s);
             }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
-        }
-
-        bool IsDouble() const {
-            try {
-                if (IsInt()) {
-                    return true;
-                }
-                double var = std::get<double>(node_);
-                (void)&var;
-                return true;
-            }
-            catch (std::bad_variant_access&) {
-                try {
-                    double var = std::get<double>(node_);
-                    (void)&var;
-                    return true;
-                }
-                catch (std::bad_variant_access&) {
-                    return false;
-                }
-            }
-        }
-
-        double AsDouble() const {
-            try {
-                if (IsPureDouble()) {
-                    return std::get<double>(node_);
-                }
-                return AsInt() + 0.0;
-            }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
+            return std::get<int>(*this);
         }
 
         bool IsPureDouble() const {
-            try {
-                return (std::to_string(std::get<double>(node_)).find('.') != std::string::npos) ? true : false;
-            }
-            catch (std::bad_variant_access&) {
-                return false;
-            }
+            return std::holds_alternative<double>(*this);
         }
-
-        bool IsNull() const {
-            try {
-                auto var = std::get<std::nullptr_t>(node_);
-                (void)&var;
-                return true;
-            }
-            catch (std::bad_variant_access&) {
-                return false;
-            }
+        bool IsDouble() const {
+            return IsInt() || IsPureDouble();
         }
-
-        bool IsString() const {
-            try {
-                std::string var = std::get<std::string>(node_);
-                (void)&var;
-                return true;
+        double AsDouble() const {
+            using namespace std::literals;
+            if (!IsDouble()) {
+                throw std::logic_error("Not a double"s);
             }
-            catch (std::bad_variant_access&) {
-                return false;
-            }
-        }
-
-        std::string AsString() const {
-            try {
-                return std::get<std::string>(node_);
-            }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
+            return IsPureDouble() ? std::get<double>(*this) : AsInt();
         }
 
         bool IsBool() const {
-            try {
-                auto var = std::get<bool>(node_);
-                (void)&var;
-                return true;
+            return std::holds_alternative<bool>(*this);
+        }
+        bool AsBool() const {
+            using namespace std::literals;
+            if (!IsBool()) {
+                throw std::logic_error("Not a bool"s);
             }
-            catch (std::bad_variant_access&) {
-                return false;
-            }
+
+            return std::get<bool>(*this);
         }
 
-        bool AsBool() const {
-            try {
-                return std::get<bool>(node_);
-            }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
+        bool IsNull() const {
+            return std::holds_alternative<std::nullptr_t>(*this);
         }
 
         bool IsArray() const {
-            try {
-                auto var = std::get<Array>(node_);
-                (void)&var;
-                return true;
+            return std::holds_alternative<Array>(*this);
+        }
+        const Array& AsArray() const {
+            using namespace std::literals;
+            if (!IsArray()) {
+                throw std::logic_error("Not an array"s);
             }
-            catch (std::bad_variant_access&) {
-                return false;
-            }
+
+            return std::get<Array>(*this);
         }
 
-        Array AsArray() const {
-            try {
-                return std::get<Array>(node_);
+        bool IsString() const {
+            return std::holds_alternative<std::string>(*this);
+        }
+        const std::string& AsString() const {
+            using namespace std::literals;
+            if (!IsString()) {
+                throw std::logic_error("Not a string"s);
             }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
+
+            return std::get<std::string>(*this);
         }
 
         bool IsMap() const {
-            try {
-                auto var = std::get<Dict>(node_);
-                (void)&var;
-                return true;
+            return std::holds_alternative<Dict>(*this);
+        }
+        const Dict& AsMap() const {
+            using namespace std::literals;
+            if (!IsMap()) {
+                throw std::logic_error("Not a map"s);
             }
-            catch (std::bad_variant_access&) {
-                return false;
-            }
+
+            return std::get<Dict>(*this);
         }
 
-        Dict AsMap() const {
-            try {
-                return std::get<Dict>(node_);
-            }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
+        bool operator==(const Node& rhs) const {
+            return GetValue() == rhs.GetValue();
         }
 
-        std::size_t GetType() const {
-            return node_.index();
+        const variant& GetValue() const {
+            return *this;
         }
-
-        Array GetArrayValue() const {
-            try {
-                return std::get<Array>(node_);
-            }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
-        }
-
-        Dict GetDictValue() const {
-            try {
-                return std::get<Dict>(node_);
-            }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
-        }
-
-        bool GetBoolValue() const {
-            try {
-                return std::get<bool>(node_);
-            }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
-        }
-
-        int GetIntValue() const {
-            try {
-                return std::get<int>(node_);
-            }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
-        }
-
-        double GetDoubleValue() const {
-            try {
-                return std::get<double>(node_);
-            }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
-        }
-
-        std::string GetStringValue() const {
-            try {
-                return std::get<std::string>(node_);
-            }
-            catch (std::bad_variant_access&) {
-                throw std::logic_error("Logic error");
-            }
-        }
-
-    private:
-        std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string> node_;
     };
+
+    inline bool operator!=(const Node& lhs, const Node& rhs) {
+        return !(lhs == rhs);
+    }
 
     class Document {
     public:
-        explicit Document(Node root);
-
-        inline bool operator==(const Document& other) const {
-            return root_ == other.root_;
+        explicit Document(Node root)
+            : root_(std::move(root)) {
         }
 
-        inline bool operator!=(const Document& other) const {
-            return !(*this == other);
+        const Node& GetRoot() const {
+            return root_;
         }
-
-        const Node& GetRoot() const;
 
     private:
         Node root_;
     };
+
+    inline bool operator==(const Document& lhs, const Document& rhs) {
+        return lhs.GetRoot() == rhs.GetRoot();
+    }
+
+    inline bool operator!=(const Document& lhs, const Document& rhs) {
+        return !(lhs == rhs);
+    }
 
     Document Load(std::istream& input);
 

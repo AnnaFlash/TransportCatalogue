@@ -4,25 +4,27 @@ void TransportCatalogue::AddStop(std::string_view stop, const double lat, const 
 {
 	Stop s = { std::string(stop), {lat, longt}, {} };
 	stops_.emplace(stop, std::move(s));
-    auto correct_name = stops_.extract(std::string(stop));
-    correct_name.key() = correct_name.mapped().name;
+	auto correct_name = stops_.extract(std::string(stop));
+	correct_name.key() = correct_name.mapped().name;
 	stops_.insert(std::move(correct_name)).position->second;
 	stop_to_buses_[stops_.at(stop).name];
 }
 
-void TransportCatalogue::AddBus(std::string_view bus, std::vector<std::string_view> stops, bool is_round)
+void TransportCatalogue::AddBus(std::string_view bus, std::vector<std::string_view> stops, std::vector<std::string> end_points)
 {
-	Bus b = { std::string(bus), {} };
+	Bus b = { std::string(bus), {}, 0, 0.0, {} };
 	for (auto& s : stops) {
-		b.b_stops.push_back(FindStop(s));
+		b.b_stops.push_back(*FindStop(s));
 	}
-	b.round = is_round;
+	for (auto& end_point : end_points) {
+		b.end_points_.push_back(*FindStop(end_point));
+	}
 	buses_.emplace(bus, std::move(b));
 	auto correct_name = buses_.extract(std::string(bus));
 	correct_name.key() = correct_name.mapped().B_name;
 	buses_.insert(std::move(correct_name)).position->second;
 	for (auto s : stops) {
-		stop_to_buses_[FindStop(s).name].insert(FindBus(bus).B_name);
+		stop_to_buses_[(*FindStop(s)).name].insert((*FindBus(bus)).B_name);
 	}
 }
 
@@ -46,51 +48,67 @@ void TransportCatalogue::AddLenth(const std::string_view bus) {
 
 void TransportCatalogue::AddDistances(const std::string_view stop1, const std::string_view stop2, const int distance)
 {
-	FindStop(stop1).distances.emplace(&FindStop(stop2), distance);
+	if (FindStop(stop1)) {
+		(*FindStop(stop1)).distances.emplace(FindStop(stop2), distance);
+	}
 }
 
 [[nodiscard]] inline int TransportCatalogue::GetDistances(const std::string_view stop1, const std::string_view stop2) const
 {
-	auto& stop1_S = FindStop(stop1);
-	auto& stop2_S = FindStop(stop2);
+	auto stop1_S = FindStop(stop1);
+	auto stop2_S = FindStop(stop2);
 
-	if (stop1_S.distances.count(&stop2_S)) {
-		return stop1_S.distances.at(&stop2_S);
+	if ((*stop1_S).distances.count(stop2_S)) {
+		return (*stop1_S).distances.at(stop2_S);
 	}
-	return stop2_S.distances.at(&stop1_S);
+	return (*stop2_S).distances.at(stop1_S);
 }
 
-[[nodiscard]] inline Bus& TransportCatalogue::FindBus(const std::string_view bus) const
+[[nodiscard]] Bus* TransportCatalogue::FindBus(const std::string_view bus) const
 {
 	if (buses_.count(bus)) {
-		return const_cast<Bus&>(buses_.at(bus));
+		return const_cast<Bus*>(&buses_.at(bus));
 	}
 	else {
-		throw std::invalid_argument("bus does not exists!");
+		return nullptr;
 	}
 }
 
-[[nodiscard]] inline Stop& TransportCatalogue::FindStop(const std::string_view stop) const
+[[nodiscard]] std::unordered_set<Bus*> TransportCatalogue::GetBusesByStop(std::string_view stop_name) const {
+	std::unordered_set<Bus*> answer;
+	if (stop_to_buses_.count(stop_name)) {
+		for (auto& bus : stop_to_buses_.at(stop_name)) {
+			answer.insert(&(*FindBus(bus)));
+		}
+	}
+	return answer;
+}
+
+[[nodiscard]] Stop* TransportCatalogue::FindStop(const std::string_view stop) const
 {
 	if (stops_.count(stop)) {
-		return const_cast<Stop&>(stops_.at(stop));
+		return const_cast<Stop*>(&stops_.at(stop));
 	}
 	else {
-		throw std::invalid_argument("stop does not exists!");
+		return nullptr;
 	}
 }
 
-void transport_catalogue::TransportCatalogue::GetBuses(std::vector<Bus>& answer) const
+std::vector<Bus> transport_catalogue::TransportCatalogue::GetBuses() const
 {
+	std::vector<Bus> answer;
 	for (auto f : buses_) {
 		answer.push_back(f.second);
 	}
+	return answer;
 }
-void transport_catalogue::TransportCatalogue::GetStops(std::vector<Stop>& answer) const
+std::vector<Stop> transport_catalogue::TransportCatalogue::GetStops() const
 {
+	std::vector<Stop> answer;
 	for (auto f : stops_) {
 		answer.push_back(f.second);
 	}
+	return answer;
 }
 [[nodiscard]] BusInfo TransportCatalogue::GetBusInfo(const std::string_view bus) const noexcept
 {

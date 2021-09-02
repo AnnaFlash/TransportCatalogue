@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -21,7 +22,7 @@ namespace transport_catalogue {
 		std::deque<Stop> b_stops;
 		int length_ = 0;
 		double curvature_ = 0.0;
-		bool round = false;
+		std::vector<Stop> end_points_;
 	};
 
 	struct BusInfo {
@@ -42,6 +43,7 @@ namespace detail {
 		std::string name;
 		std::vector<std::string> stops;
 		bool is_round;
+		std::vector<std::string> end_points_;
 	};
 	struct StopDistances {
 		std::string stop;
