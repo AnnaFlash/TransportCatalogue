@@ -1,4 +1,4 @@
-#include "request_handler.h"
+﻿#include "request_handler.h"
 
 #include "map_renderer.h"
 #include "transport_catalogue.h"
@@ -10,26 +10,21 @@ namespace transport_catalogue::service {
         , renderer_(renderer) {
     }
 
-    BusInfo RequestHandler::GetBusStat(const std::string_view& bus_name) const noexcept {
+    std::optional<BusInfo> RequestHandler::GetBusStat(const std::string_view& bus_name) const {
         const Bus* bus = db_.FindBus(bus_name);
-        return bus ? db_.GetBusInfo(bus_name) : BusInfo();
+        return bus ? std::make_optional(db_.GetBusInfo(bus->B_name)) : std::nullopt;
     }
 
-    const std::unordered_set<Bus*> RequestHandler::GetBusesByStop(
+    const std::unordered_set<Bus*>* RequestHandler::GetBusesByStop(
         const std::string_view& stop_name) const {
-        const Stop* stop = db_.FindStop(stop_name);
-        std::unordered_set<Bus*> answer;
-        if (stop) { answer = (db_.GetBusesByStop(stop->name)); }
-        else {
-            throw std::out_of_range("");
-        }
-        return answer;
+        Stop* stop = db_.FindStop(stop_name);
+        return stop ? &(db_.GetBusesByStop(stop)) : nullptr;
     }
 
     svg::Document RequestHandler::RenderMap() const {
-        const auto& buses = db_.GetBuses();
+        const auto buses = db_.GetBuses();
         svg::Document doc;
-        renderer_.RenderMap(buses.begin(), buses.end()).Draw(doc);
+        renderer_.RenderMap(buses).Draw(doc);
         return doc;
     }
 

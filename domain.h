@@ -19,10 +19,10 @@ namespace transport_catalogue {
 
 	struct Bus {
 		std::string B_name;
-		std::deque<Stop> b_stops;
+		std::deque<Stop*> b_stops;
 		int length_ = 0;
 		double curvature_ = 0.0;
-		std::vector<Stop> end_points_;
+		std::vector<Stop*> end_points_;
 	};
 
 	struct BusInfo {

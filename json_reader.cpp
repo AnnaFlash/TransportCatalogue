@@ -35,7 +35,7 @@ namespace transport_catalogue::json_reader {
 
     namespace {
 
-        detail::Bus_to_Add ReadBusDesc(const json::Dict& bus_json, std::vector<std::string>& buses_names) {
+        detail::Bus_to_Add ParsingBuses(const json::Dict& bus_json, std::vector<std::string>& buses_names) {
             detail::Bus_to_Add req;
             req.name = bus_json.at("name"s).AsString();
             req.is_round = bus_json.at("is_roundtrip"s).AsBool();
@@ -48,6 +48,9 @@ namespace transport_catalogue::json_reader {
             if (req.is_round == false) {
                 req.end_points_.push_back(req.stops[0]);
                 req.end_points_.push_back(req.stops[req.stops.size() - 1]);
+                if (req.end_points_.size() == 2 && req.end_points_[0] == req.end_points_[1]) {
+                    req.end_points_.pop_back();
+                }
                 req.stops.reserve(req.stops.size() * 2 - 1);
                 for (auto it = ++std::rbegin(req.stops); it != std::rend(req.stops); ++it) {
                     req.stops.emplace_back(*it);
@@ -59,7 +62,7 @@ namespace transport_catalogue::json_reader {
             return req;
         }
 
-        Stop_to_Add ReadStopDesc(std::vector<detail::StopDistances>& dist, const json::Dict& stop_json) {
+        Stop_to_Add ParsingStops(std::vector<detail::StopDistances>& dist, const json::Dict& stop_json) {
             Stop_to_Add req;
             req.name = stop_json.at("name"s).AsString();
             req.lat = stop_json.at("latitude"s).AsDouble();
@@ -69,7 +72,7 @@ namespace transport_catalogue::json_reader {
                 const auto& neighbors_json = stop_json.at("road_distances"s).AsMap();
                 detail::StopDistances distances = {req.name, {} };
                 for (const auto& [name, distance] : neighbors_json) {
-                    distances.distances.emplace(std::move(name), distance.AsInt());
+                    distances.distances.emplace(name, distance.AsInt());
                 }
                 dist.emplace_back(std::move(distances));
             }
@@ -128,18 +131,15 @@ namespace transport_catalogue::json_reader {
         // -------------
 
         const json::Dict NOT_FOUND_RESPONSE_JSON{ {"error_message"s, json::Node{"not found"s}} };
-
         struct BusRequest {
             std::string name;
-
-            json::Dict Execute(const service::RequestHandler& handler) const {
-                const auto bus_stat = handler.GetBusStat(name);
-                if (bus_stat.exists) {
+                json::Dict Execute(const service::RequestHandler& handler) const {
+                if (const auto bus_stat = handler.GetBusStat(name)) {
                     return json::Dict{
-                        {"stop_count"s, json::Node{static_cast<int>(bus_stat.stops)}},
-                        {"unique_stop_count"s, json::Node{static_cast<int>(bus_stat.uniq_stops)}},
-                        {"route_length"s, json::Node{bus_stat.length}},
-                        {"curvature"s, json::Node{bus_stat.curvature}},
+                        {"stop_count"s, json::Node{static_cast<int>(bus_stat->stops)}},
+                        {"unique_stop_count"s, json::Node{static_cast<int>(bus_stat->uniq_stops)}},
+                        {"route_length"s, json::Node{bus_stat->length}},
+                        {"curvature"s, json::Node{bus_stat->curvature}},
                     };
                 }
                 else {
@@ -152,22 +152,19 @@ namespace transport_catalogue::json_reader {
             std::string name;
 
             json::Dict Execute(const service::RequestHandler& handler) const {
-                try {
-                    const auto buses = handler.GetBusesByStop(name);
-                    std::vector<Bus*> bus_vector{ buses.begin(), buses.end() };
+                if (const auto buses = handler.GetBusesByStop(name)) {
+                    std::vector<Bus*> bus_vector{ buses->begin(), buses->end() };
                     std::sort(bus_vector.begin(), bus_vector.end(), [](Bus* lhs, Bus* rhs) {
                         return lhs->B_name < rhs->B_name;
                         });
-
-                    json::Array bus_names;
-                    bus_names.reserve(buses.size());
+                        json::Array bus_names;
+                    bus_names.reserve(buses->size());
                     for (const auto& bus : bus_vector) {
                         bus_names.emplace_back(bus->B_name);
                     }
-
-                    return { {"buses"s, std::move(bus_names)} };
+                        return { {"buses"s, std::move(bus_names)} };
                 }
-                catch(std::out_of_range) {
+                else {
                     return NOT_FOUND_RESPONSE_JSON;
                 }
             }
@@ -215,10 +212,10 @@ namespace transport_catalogue::json_reader {
             const auto& props_json = req_json.AsMap();
             const std::string& type = props_json.at("type"s).AsString();
             if (type == "Bus"sv) {
-               buses.push_back(ReadBusDesc(props_json, buses_names));
+               buses.push_back(ParsingBuses(props_json, buses_names));
             }
             else if (type == "Stop"sv) {
-                Stop_to_Add s = ReadStopDesc(dist, props_json);
+                Stop_to_Add s = ParsingStops(dist, props_json);
                 catalogue.AddStop(s.name, s.lat, s.longt);
             }
             else {

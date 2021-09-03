@@ -1,4 +1,4 @@
-#include "map_renderer.h"
+﻿#include "map_renderer.h"
 
 #include <algorithm>
 #include <unordered_set>
@@ -73,43 +73,31 @@ namespace transport_catalogue::renderer {
 
     }  // namespace
 
-    MapView::MapView(RenderSettings render_settings, std::vector<Bus> buses)
+    MapView::MapView(RenderSettings render_settings, std::vector<Bus*> buses)
         : render_settings_(std::move(render_settings))
         , buses_(std::move(buses))  //
     {
-        std::sort(buses_.begin(), buses_.end(), [](Bus lhs, Bus rhs) {
-            return lhs.B_name < rhs.B_name;
+        std::sort(buses_.begin(), buses_.end(), [](Bus* lhs, Bus* rhs) {
+            return lhs->B_name < rhs->B_name;
             });
-        std::sort(buses_.begin(), buses_.end(), [](const Bus& lhs, const Bus& rhs) {return lhs.B_name < rhs.B_name; });
-        auto it1 = std::unique(buses_.begin(), buses_.end(), [](const Bus& lhs, const Bus& rhs) {
-            // comparison function that returns true or false
-            return lhs.B_name == rhs.B_name; });
-        buses_.erase(it1, buses_.end());
-        std::vector<Stop> stops;
-        for (Bus bus : buses_) {
-            for (Stop st : bus.b_stops) {
-                stops.push_back(st);
-            }
+
+        std::unordered_set<Stop*> stops;
+        for (const Bus* bus : buses_) {
+            stops.insert(bus->b_stops.begin(), bus->b_stops.end());
         }
 
-        std::sort(stops.begin(), stops.end(), [](const Stop& lhs, const Stop& rhs) {return lhs.name < rhs.name; });
-        auto it = std::unique(stops.begin(), stops.end(), [](const Stop& lhs, const Stop& rhs) {
-            // comparison function that returns true or false
-            return lhs.name == rhs.name; });
-        stops.erase(it, stops.end());
         std::vector<distance::Coordinates> geo_coords;
         geo_coords.reserve(stops.size());
-        for (const Stop stop : stops) {
-            geo_coords.push_back((stop).coordinates);
+        for (const Stop* stop : stops) {
+            geo_coords.push_back(stop->coordinates);
         }
 
         SphereProjector projector{ geo_coords.begin(), geo_coords.end(), render_settings_.max_width,
                                   render_settings_.max_height, render_settings_.padding };
-        for (const Stop stop : stops) {
-            stops_coords_[stop] = projector((stop).coordinates);
+        for (const Stop* stop : stops) {
+            stops_coords_[stop] = projector(stop->coordinates);
         }
     }
-
     void MapView::Draw(svg::ObjectContainer& container) const {
         DrawRoutes(container);
         DrawRoutesNames(container);
@@ -120,9 +108,8 @@ namespace transport_catalogue::renderer {
     void MapView::DrawRoutes(svg::ObjectContainer& container) const {
         using namespace svg;
         size_t bus_index = 0;
-        for (const Bus bus : buses_) {
-            const auto stops = bus.b_stops;
-            if (!stops.empty()) {
+        for (const Bus* bus : buses_) {
+            if (const auto& stops = bus->b_stops; !stops.empty()) {
                 Polyline line;
                 line.SetStrokeColor(GetBusLineColor(bus_index++))
                     .SetStrokeWidth(render_settings_.line_width)
@@ -130,9 +117,9 @@ namespace transport_catalogue::renderer {
                     .SetFillColor(NoneColor)
                     .SetStrokeLineJoin(StrokeLineJoin::ROUND);
 
-                for (const Stop stop : stops) {
-                    line.AddPoint(stops_coords_.at(stop));
-                }
+                    for (const Stop* stop : stops) {
+                        line.AddPoint(stops_coords_.at(stop));
+                    }
                 container.Add(std::move(line));
             }
         }
@@ -142,31 +129,36 @@ namespace transport_catalogue::renderer {
         using namespace svg;
 
         size_t bus_index = 0;
-        for (const Bus bus : buses_) {
-            if (bus.b_stops.empty()) {
+        for (const Bus* bus : buses_) {
+            if (bus->b_stops.empty()) {
                 continue;
             }
             const auto& bus_color = GetBusLineColor(bus_index++);
 
-            for (const Stop endpoint : bus.end_points_) {
+            for (const Stop* endpoint : bus->end_points_) {
                 const auto& stop_coord = stops_coords_.at(endpoint);
 
-                const auto base_text =  //
+                container.Add(Text()
+                    .SetPosition(stop_coord)
+                    .SetOffset(render_settings_.bus_label_offset)
+                    .SetFontSize(render_settings_.bus_label_font_size)
+                    .SetFontFamily(render_settings_.bus_label_font_family)
+                    .SetFontWeight("bold"s)
+                    .SetData(bus->B_name).SetFillColor(bus_color));
+
+                container.Add(  //
                     Text()
                     .SetPosition(stop_coord)
                     .SetOffset(render_settings_.bus_label_offset)
                     .SetFontSize(render_settings_.bus_label_font_size)
                     .SetFontFamily(render_settings_.bus_label_font_family)
                     .SetFontWeight("bold"s)
-                    .SetData(bus.B_name);
-                container.Add(  //
-                    Text{ base_text }
+                    .SetData(bus->B_name)
                     .SetFillColor(render_settings_.underlayer_color)
                     .SetStrokeColor(render_settings_.underlayer_color)
                     .SetStrokeWidth(render_settings_.underlayer_width)
                     .SetStrokeLineCap(StrokeLineCap::ROUND)
                     .SetStrokeLineJoin(StrokeLineJoin::ROUND));
-                container.Add(Text{ base_text }.SetFillColor(bus_color));
             }
         }
     }
@@ -191,7 +183,7 @@ namespace transport_catalogue::renderer {
                 .SetOffset(render_settings_.stop_label_offset)
                 .SetFontSize(render_settings_.stop_label_font_size)
                 .SetFontFamily(render_settings_.stop_label_font_family)
-                .SetData(stop.name);
+                .SetData(stop->name);
             container.Add(  //
                 Text{ base_text }
                 .SetFillColor(render_settings_.underlayer_color)

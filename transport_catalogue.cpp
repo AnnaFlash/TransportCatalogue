@@ -14,18 +14,22 @@ void TransportCatalogue::AddBus(std::string_view bus, std::vector<std::string_vi
 {
 	Bus b = { std::string(bus), {}, 0, 0.0, {} };
 	for (auto& s : stops) {
-		b.b_stops.push_back(*FindStop(s));
+		b.b_stops.push_back(FindStop(s));
 	}
+	
 	for (auto& end_point : end_points) {
-		b.end_points_.push_back(*FindStop(end_point));
+		b.end_points_.push_back(FindStop(end_point));
 	}
+	
 	buses_.emplace(bus, std::move(b));
 	auto correct_name = buses_.extract(std::string(bus));
 	correct_name.key() = correct_name.mapped().B_name;
 	buses_.insert(std::move(correct_name)).position->second;
 	for (auto s : stops) {
 		stop_to_buses_[(*FindStop(s)).name].insert((*FindBus(bus)).B_name);
+		bus_by_stop_[FindStop(s)].insert(&buses_.at(bus));
 	}
+	deq_buses_.push_back(&buses_.at(bus));
 }
 
 void TransportCatalogue::AddLenth(const std::string_view bus) {
@@ -34,14 +38,14 @@ void TransportCatalogue::AddLenth(const std::string_view bus) {
 	auto it1_end = buses_.at(bus).b_stops.end();
 	auto it2 = it1++;
 	for (auto it = it1; it != it1_end; ++it, ++it2) {
-		geographical_length += distance::ComputeDistance(it2->coordinates, it->coordinates);
+		geographical_length += distance::ComputeDistance((*it2)->coordinates, (*it)->coordinates);
 	}
 	it1 = buses_.at(bus).b_stops.begin();
 	it1_end = buses_.at(bus).b_stops.end();
 	it2 = it1++;
 	buses_[bus].length_ = 0;
 	for (auto it = it1; it != it1_end; ++it, ++it2) {
-		buses_[bus].length_ += GetDistances(it2->name, it->name);
+		buses_[bus].length_ += GetDistances((*it2)->name, (*it)->name);
 	}
 	buses_[bus].curvature_ = buses_[bus].length_ / geographical_length;
 }
@@ -74,14 +78,12 @@ void TransportCatalogue::AddDistances(const std::string_view stop1, const std::s
 	}
 }
 
-[[nodiscard]] std::unordered_set<Bus*> TransportCatalogue::GetBusesByStop(std::string_view stop_name) const {
-	std::unordered_set<Bus*> answer;
-	if (stop_to_buses_.count(stop_name)) {
-		for (auto& bus : stop_to_buses_.at(stop_name)) {
-			answer.insert(&(*FindBus(bus)));
-		}
-	}
-	return answer;
+const std::unordered_set<Bus*>& TransportCatalogue::GetBusesByStop(Stop* stop) const {
+	static const std::unordered_set<Bus*> dummy;
+
+	auto iter = bus_by_stop_.find(stop);
+
+	return iter == bus_by_stop_.end() ? dummy : iter->second;
 }
 
 [[nodiscard]] Stop* TransportCatalogue::FindStop(const std::string_view stop) const
@@ -94,14 +96,6 @@ void TransportCatalogue::AddDistances(const std::string_view stop1, const std::s
 	}
 }
 
-std::vector<Bus> transport_catalogue::TransportCatalogue::GetBuses() const
-{
-	std::vector<Bus> answer;
-	for (auto f : buses_) {
-		answer.push_back(f.second);
-	}
-	return answer;
-}
 std::vector<Stop> transport_catalogue::TransportCatalogue::GetStops() const
 {
 	std::vector<Stop> answer;
@@ -118,7 +112,7 @@ std::vector<Stop> transport_catalogue::TransportCatalogue::GetStops() const
 	BusInfo i = { true, static_cast<int>(buses_.at(bus).b_stops.size()), 0, 0, 0.0 };
 	std::unordered_set<std::string_view> uniq;
 	for (auto& st : buses_.at(bus).b_stops) {
-		uniq.emplace(st.name);
+		uniq.emplace(st->name);
 	}
 	i.uniq_stops = static_cast<int>(uniq.size());
 	const Bus& b = buses_.at(bus);

@@ -22,14 +22,19 @@ namespace transport_catalogue {
 		[[nodiscard]] inline int GetDistances(const std::string_view stop1, const std::string_view stop2) const;
 		[[nodiscard]] Bus* FindBus(const std::string_view bus) const;
 		[[nodiscard]] Stop* FindStop(const std::string_view stop) const;
-		[[nodiscard]] std::vector<Bus> GetBuses() const;
 		[[nodiscard]] inline std::vector<Stop> GetStops() const;
-		[[nodiscard]] std::unordered_set<Bus*> GetBusesByStop(std::string_view stop_name) const;
+		const std::unordered_set<Bus*>& GetBusesByStop(Stop* stop) const;
 		[[nodiscard]] BusInfo GetBusInfo(const std::string_view bus) const noexcept;
 		[[nodiscard]] StopInfo GetStopInfo(const std::string_view stop) const noexcept;
+		const std::vector<Bus*> GetBuses() const noexcept
+		{
+			return deq_buses_;
+		}
 	private:
+		std::vector<Bus*> deq_buses_;
 		std::unordered_map<std::string_view, Stop> stops_;
 		std::unordered_map<std::string_view, Bus> buses_;
 		std::unordered_map<std::string_view, std::set<std::string_view>> stop_to_buses_;
+		std::unordered_map<Stop*, std::unordered_set<Bus*>> bus_by_stop_;
 	};
 }

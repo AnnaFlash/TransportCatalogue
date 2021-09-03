@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "domain.h"
 
 #include <optional>
@@ -24,9 +24,9 @@ namespace transport_catalogue {
         public:
             RequestHandler(const TransportCatalogue& db, const renderer::MapRenderer& renderer);
 
-            [[nodiscard]] BusInfo GetBusStat(const std::string_view& bus_name) const noexcept;
+            std::optional<BusInfo> GetBusStat(const std::string_view& bus_name) const;
 
-            const std::unordered_set<Bus*> GetBusesByStop(
+            const std::unordered_set<Bus*>* GetBusesByStop(
                 const std::string_view& stop_name) const;
 
             svg::Document RenderMap() const;
