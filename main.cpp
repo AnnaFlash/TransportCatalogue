@@ -12,8 +12,8 @@ using namespace std::literals;
 
 int main(int argc, char* argv[]) {
     using namespace transport_catalogue;
-    std::ifstream in("C:\\test5.txt");
-    std::ofstream out("ans5.txt");
+    std::ifstream in("C:\\test6.txt");
+    std::ofstream out("ans6.txt");
     try {
         transport_catalogue::TransportCatalogue db;
         const auto json = json::Load(in).GetRoot().AsMap();

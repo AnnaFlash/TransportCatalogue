@@ -26,7 +26,7 @@ namespace transport_catalogue {
 		const std::unordered_set<Bus*>& GetBusesByStop(Stop* stop) const;
 		[[nodiscard]] BusInfo GetBusInfo(const std::string_view bus) const noexcept;
 		[[nodiscard]] StopInfo GetStopInfo(const std::string_view stop) const noexcept;
-		const std::vector<Bus*> GetBuses() const noexcept
+		const std::vector<Bus*> GetBuses() const
 		{
 			return deq_buses_;
 		}

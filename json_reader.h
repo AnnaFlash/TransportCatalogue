@@ -1,7 +1,6 @@
 #pragma once
-#include "json.h"
 #include "map_renderer.h"
-
+#include "json_builder.h"
 #include <stdexcept>
 
 namespace transport_catalogue {
@@ -30,7 +29,7 @@ namespace transport_catalogue {
 
         void ReadTransportCatalogue(transport_catalogue::TransportCatalogue& catalogue, const json::Array& base_requests_json);
 
-        void ReadRenderSettings(renderer::RenderSettings& rs,const json::Dict& render_settings_json);
+        void ReadRenderSettings(renderer::RenderSettings& rs, const json::Dict& render_settings_json);
 
         json::Array HandleRequests(const json::Array& requests_json,
             const service::RequestHandler& handler);

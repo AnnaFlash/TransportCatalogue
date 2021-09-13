@@ -70,7 +70,7 @@ namespace transport_catalogue::json_reader {
             if (const auto distances_it = stop_json.find("road_distances"s);
                 distances_it != stop_json.end()) {
                 const auto& neighbors_json = stop_json.at("road_distances"s).AsMap();
-                detail::StopDistances distances = {req.name, {} };
+                detail::StopDistances distances = { req.name, {} };
                 for (const auto& [name, distance] : neighbors_json) {
                     distances.distances.emplace(name, distance.AsInt());
                 }
@@ -130,20 +130,19 @@ namespace transport_catalogue::json_reader {
 
         // -------------
 
-        const json::Dict NOT_FOUND_RESPONSE_JSON{ {"error_message"s, json::Node{"not found"s}} };
         struct BusRequest {
             std::string name;
-                json::Dict Execute(const service::RequestHandler& handler) const {
+            json::Node Execute(const service::RequestHandler& handler, const int id_) const {
                 if (const auto bus_stat = handler.GetBusStat(name)) {
-                    return json::Dict{
-                        {"stop_count"s, json::Node{static_cast<int>(bus_stat->stops)}},
-                        {"unique_stop_count"s, json::Node{static_cast<int>(bus_stat->uniq_stops)}},
-                        {"route_length"s, json::Node{bus_stat->length}},
-                        {"curvature"s, json::Node{bus_stat->curvature}},
-                    };
+                    return json::Builder{}.StartDict().Key("stop_count").Value(json::Node::Value{ static_cast<int>(bus_stat->stops) })
+                        .Key("unique_stop_count").Value(json::Node::Value{ static_cast<int>(bus_stat->uniq_stops) })
+                        .Key("route_length").Value(json::Node::Value{ bus_stat->length })
+                        .Key("curvature").Value(json::Node::Value{ bus_stat->curvature })
+                        .Key("request_id").Value(json::Node::Value{ id_ }).EndDict().Build();
                 }
                 else {
-                    return NOT_FOUND_RESPONSE_JSON;
+                    return json::Builder{}.StartDict().Key("error_message").Value("not found"s)
+                        .Key("request_id").Value(json::Node::Value{ id_ }).EndDict().Build();
                 }
             }
         };
@@ -151,50 +150,51 @@ namespace transport_catalogue::json_reader {
         struct StopRequest {
             std::string name;
 
-            json::Dict Execute(const service::RequestHandler& handler) const {
+            json::Node Execute(const service::RequestHandler& handler, const int id_) const {
                 if (const auto buses = handler.GetBusesByStop(name)) {
                     std::vector<Bus*> bus_vector{ buses->begin(), buses->end() };
                     std::sort(bus_vector.begin(), bus_vector.end(), [](Bus* lhs, Bus* rhs) {
                         return lhs->B_name < rhs->B_name;
                         });
-                        json::Array bus_names;
-                    bus_names.reserve(buses->size());
+                    json::Builder builder;
+                    builder.StartDict().Key("buses").StartArray();
                     for (const auto& bus : bus_vector) {
-                        bus_names.emplace_back(bus->B_name);
+                        builder.Value(json::Node::Value{ bus->B_name });
                     }
-                        return { {"buses"s, std::move(bus_names)} };
+                    builder.EndArray().Key("request_id").Value(json::Node::Value{ id_ }).EndDict();
+                    return builder.Build();
                 }
                 else {
-                    return NOT_FOUND_RESPONSE_JSON;
+                    return json::Builder{}.StartDict().Key("error_message").Value("not found"s)
+                        .Key("request_id").Value(json::Node::Value{ id_ }).EndDict().Build();
                 }
             }
         };
 
         struct MapRequest {
-            json::Dict Execute(const service::RequestHandler& handler) const {
+            json::Node Execute(const service::RequestHandler& handler, const int id_) const {
                 std::ostringstream strm;
                 handler.RenderMap().Render(strm);
-                return { {"map"s, strm.str()} };
+                return json::Builder{}.StartDict().Key("map").Value(strm.str())
+                    .Key("request_id").Value(json::Node::Value{ id_ }).EndDict().Build();
             }
         };
-        json::Dict HandleRequest(const json::Dict& request_json, const service::RequestHandler& handler) {
+
+        json::Node HandleRequest(const json::Dict& request_json, const service::RequestHandler& handler) {
             const std::string& type = request_json.at("type"s).AsString();
             if (type == "Bus"sv) {
                 const auto request = BusRequest{ request_json.at("name"s).AsString() };
-                auto response_json = request.Execute(handler);
-                response_json["request_id"s] = request_json.at("id"s).AsInt();
+                auto response_json = request.Execute(handler, request_json.at("id"s).AsInt());
                 return response_json;
             }
             else if (type == "Stop"sv) {
                 const auto request = StopRequest{ request_json.at("name"s).AsString() };
-                auto response_json = request.Execute(handler);
-                response_json["request_id"s] = request_json.at("id"s).AsInt();
+                auto response_json = request.Execute(handler, request_json.at("id"s).AsInt());
                 return response_json;
             }
             else if (type == "Map"sv) {
                 const auto request = MapRequest{};
-                auto response_json = request.Execute(handler);
-                response_json["request_id"s] = request_json.at("id"s).AsInt();
+                auto response_json = request.Execute(handler, request_json.at("id"s).AsInt());
                 return response_json;
             }
             else {
@@ -212,7 +212,7 @@ namespace transport_catalogue::json_reader {
             const auto& props_json = req_json.AsMap();
             const std::string& type = props_json.at("type"s).AsString();
             if (type == "Bus"sv) {
-               buses.push_back(ParsingBuses(props_json, buses_names));
+                buses.push_back(ParsingBuses(props_json, buses_names));
             }
             else if (type == "Stop"sv) {
                 Stop_to_Add s = ParsingStops(dist, props_json);
@@ -250,11 +250,9 @@ namespace transport_catalogue::json_reader {
         const service::RequestHandler& handler) {
         json::Array responses_json;
         responses_json.reserve(requests_json.size());
-
         for (const json::Node& request_json : requests_json) {
             responses_json.emplace_back(HandleRequest(request_json.AsMap(), handler));
         }
-
         return responses_json;
     }
 

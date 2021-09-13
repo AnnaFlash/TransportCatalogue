@@ -117,9 +117,9 @@ namespace transport_catalogue::renderer {
                     .SetFillColor(NoneColor)
                     .SetStrokeLineJoin(StrokeLineJoin::ROUND);
 
-                    for (const Stop* stop : stops) {
-                        line.AddPoint(stops_coords_.at(stop));
-                    }
+                for (const Stop* stop : stops) {
+                    line.AddPoint(stops_coords_.at(stop));
+                }
                 container.Add(std::move(line));
             }
         }
@@ -127,7 +127,6 @@ namespace transport_catalogue::renderer {
 
     void MapView::DrawRoutesNames(svg::ObjectContainer& container) const {
         using namespace svg;
-
         size_t bus_index = 0;
         for (const Bus* bus : buses_) {
             if (bus->b_stops.empty()) {
@@ -138,27 +137,22 @@ namespace transport_catalogue::renderer {
             for (const Stop* endpoint : bus->end_points_) {
                 const auto& stop_coord = stops_coords_.at(endpoint);
 
-                container.Add(Text()
-                    .SetPosition(stop_coord)
-                    .SetOffset(render_settings_.bus_label_offset)
-                    .SetFontSize(render_settings_.bus_label_font_size)
-                    .SetFontFamily(render_settings_.bus_label_font_family)
-                    .SetFontWeight("bold"s)
-                    .SetData(bus->B_name).SetFillColor(bus_color));
-
-                container.Add(  //
+                const auto base_text =  //
                     Text()
                     .SetPosition(stop_coord)
                     .SetOffset(render_settings_.bus_label_offset)
                     .SetFontSize(render_settings_.bus_label_font_size)
                     .SetFontFamily(render_settings_.bus_label_font_family)
                     .SetFontWeight("bold"s)
-                    .SetData(bus->B_name)
+                    .SetData(bus->B_name);
+                container.Add(  //
+                    Text{ base_text }
                     .SetFillColor(render_settings_.underlayer_color)
                     .SetStrokeColor(render_settings_.underlayer_color)
                     .SetStrokeWidth(render_settings_.underlayer_width)
                     .SetStrokeLineCap(StrokeLineCap::ROUND)
                     .SetStrokeLineJoin(StrokeLineJoin::ROUND));
+                container.Add(Text{ base_text }.SetFillColor(bus_color));
             }
         }
     }

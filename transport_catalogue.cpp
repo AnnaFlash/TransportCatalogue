@@ -16,11 +16,9 @@ void TransportCatalogue::AddBus(std::string_view bus, std::vector<std::string_vi
 	for (auto& s : stops) {
 		b.b_stops.push_back(FindStop(s));
 	}
-	
 	for (auto& end_point : end_points) {
 		b.end_points_.push_back(FindStop(end_point));
 	}
-	
 	buses_.emplace(bus, std::move(b));
 	auto correct_name = buses_.extract(std::string(bus));
 	correct_name.key() = correct_name.mapped().B_name;
