@@ -1,4 +1,4 @@
-#include "json_builder.h"
+ï»¿#include "json_builder.h"
 using namespace std;
 namespace json {
 
@@ -52,7 +52,7 @@ namespace json {
     ArrayContext::ArrayContext(Builder& builder) : ValueAfterArrayContext(builder) {}
     KeyContext& Builder::Key(string key) {
         if (CanTApplyKey()) {
-            throw logic_error("Key ñan't be applied");
+            throw logic_error("Key Ã±an't be applied");
         }
         nodes_.push(make_unique<Node>(key));
         return *this;
@@ -60,7 +60,7 @@ namespace json {
 
     Builder& Builder::Value(Node::Value value) {
         if (CanTApplyValue()) {
-            throw std::logic_error("Value ñan't be applied");
+            throw std::logic_error("Value Ã±an't be applied");
         }
         PushNode(value);
         return AddNode(*nodes_.top().release());
@@ -68,7 +68,7 @@ namespace json {
 
     MapContext& Builder::StartDict() {
         if (CanTApplyStartDict()) {
-            throw logic_error("StartDict ñan't be applied");
+            throw logic_error("StartDict Ã±an't be applied");
         }
         nodes_.push(make_unique<Node>(Dict()));
         return *this;
@@ -76,14 +76,14 @@ namespace json {
 
     Builder& Builder::EndDict() {
         if (CanTApplyEndDict()) {
-            throw logic_error("EndDict ñan't be applied");
+            throw logic_error("EndDict Ã±an't be applied");
         }
         return AddNode(*nodes_.top().release());
     }
 
     ArrayContext& Builder::StartArray() {
         if (CanTApplyStartArray()) {
-            throw logic_error("StartArray ñan't be applied");
+            throw logic_error("StartArray Ã±an't be applied");
         }
         nodes_.push(make_unique<Node>(Array()));
         return *this;
@@ -91,14 +91,14 @@ namespace json {
 
     Builder& Builder::EndArray() {
         if (CanTApplyEndArray()) {
-            throw logic_error("EndArray ñan't be applied");
+            throw logic_error("EndArray Ã±an't be applied");
         }
         return AddNode(*nodes_.top().release());
     }
 
     Node Builder::Build() const {
         if (CanTApplyBuild()) {
-            throw logic_error("Builder ñan't be applied");
+            throw logic_error("Builder Ã±an't be applied");
         }
         return root_;
     }
@@ -161,4 +161,3 @@ namespace json {
         visit([this](auto&& val) {nodes_.push(make_unique<Node>(val)); }, value);
     }
 }
-

@@ -7,6 +7,6 @@ project ("TransportCatalogue")
 
 # Добавьте источник в исполняемый файл этого проекта.
 set(CMAKE_CXX_STANDARD 17)
-add_executable (TransportCatalogue "main.cpp" "input_reader.cpp" "stat_reader.cpp" "transport_catalogue.cpp" "json.h" "json.cpp" "svg.h" "svg.cpp" "domain.h"  "json_reader.h" "json_reader.cpp" "request_handler.h" "request_handler.cpp" "map_renderer.h"  "map_renderer.cpp" "json_builder.cpp")
+add_executable (TransportCatalogue "main.cpp" "input_reader.cpp" "stat_reader.cpp" "transport_catalogue.cpp" "json.h" "json.cpp" "svg.h" "svg.cpp" "domain.h"  "json_reader.h" "json_reader.cpp" "request_handler.h" "request_handler.cpp" "map_renderer.h"  "map_renderer.cpp" "json_builder.h" "json_builder.cpp" "graph.h" "ranges.h" "router.h" "transport_router.h" "transport_router.cpp")
 
 # TODO: Добавьте тесты и целевые объекты, если это необходимо.

@@ -12,6 +12,7 @@
 #include "geo.h"
 
 namespace transport_catalogue {
+	using StopsDistance = std::unordered_map<std::pair<StopPtr, StopPtr>, size_t, HashPairStopPtr>;
 	class TransportCatalogue
 	{
 	public:
@@ -20,21 +21,24 @@ namespace transport_catalogue {
 		void AddDistances(const std::string_view stop1, const std::string_view stop2, const int distance);
 		void AddLenth(const std::string_view bus);
 		[[nodiscard]] inline int GetDistances(const std::string_view stop1, const std::string_view stop2) const;
-		[[nodiscard]] Bus* FindBus(const std::string_view bus) const;
-		[[nodiscard]] Stop* FindStop(const std::string_view stop) const;
-		[[nodiscard]] inline std::vector<Stop> GetStops() const;
-		const std::unordered_set<Bus*>& GetBusesByStop(Stop* stop) const;
+		[[nodiscard]] size_t GetDistanceBetweenStops(StopPtr from, StopPtr to) const;
+		[[nodiscard]] BusPtr FindBus(const std::string_view bus) const;
+		[[nodiscard]] StopPtr FindStop(const std::string_view stop) const;
+		[[nodiscard]] std::vector<Stop> GetStops() const noexcept;
+		const std::set<BusPtr>* GetBusesByStop(const std::string_view& stop_name) const noexcept;
 		[[nodiscard]] BusInfo GetBusInfo(const std::string_view bus) const noexcept;
 		[[nodiscard]] StopInfo GetStopInfo(const std::string_view stop) const noexcept;
-		const std::vector<Bus*> GetBuses() const
+		const std::vector<BusPtr> GetBuses() const noexcept
 		{
 			return deq_buses_;
 		}
 	private:
-		std::vector<Bus*> deq_buses_;
+		std::vector<BusPtr> deq_buses_;
 		std::unordered_map<std::string_view, Stop> stops_;
 		std::unordered_map<std::string_view, Bus> buses_;
 		std::unordered_map<std::string_view, std::set<std::string_view>> stop_to_buses_;
-		std::unordered_map<Stop*, std::unordered_set<Bus*>> bus_by_stop_;
+		std::unordered_map<StopPtr, std::set<BusPtr>> bus_by_stop_;
+		StopsDistance distance_between_stops_;
+		std::set<BusPtr> dummy_;
 	};
 }

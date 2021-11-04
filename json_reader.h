@@ -31,8 +31,9 @@ namespace transport_catalogue {
 
         void ReadRenderSettings(renderer::RenderSettings& rs, const json::Dict& render_settings_json);
 
-        json::Array HandleRequests(const json::Array& requests_json,
-            const service::RequestHandler& handler);
+        void ReadRoutingSettings(Settings& settings, const json::Dict& routing_settings_json);
+
+        json::Array HandleRequests(const json::Array& requests_json, const service::RequestHandler& handler);
 
     }  // namespace json_reader
 }  // namespace transport_catalogue

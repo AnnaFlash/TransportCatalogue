@@ -28,7 +28,7 @@ namespace transport_catalogue {
 
         class MapView : public svg::Drawable {
         public:
-            MapView(RenderSettings render_settings, std::vector<Bus*> buses);
+            MapView(RenderSettings render_settings, std::vector<BusPtr> buses);
 
             void Draw(svg::ObjectContainer& container) const override;
 
@@ -40,15 +40,15 @@ namespace transport_catalogue {
             const svg::Color& GetBusLineColor(size_t index) const;
 
             struct SortedByName {
-                bool operator()(const Stop* lhs, const Stop* rhs) const {
+                bool operator()(StopPtr lhs, StopPtr rhs) const {
                     assert(lhs);
                     assert(rhs);
                     return lhs->name < rhs->name;
                 }
             };
             RenderSettings render_settings_;
-            std::vector<Bus*> buses_;
-            std::map<const Stop*, svg::Point, SortedByName> stops_coords_;
+            std::vector<BusPtr> buses_;
+            std::map<StopPtr, svg::Point, SortedByName> stops_coords_;
         };
 
         class MapRenderer {
@@ -56,10 +56,9 @@ namespace transport_catalogue {
             MapRenderer() = default;
             MapRenderer(RenderSettings settings);
 
-            MapView RenderMap(const std::vector<Bus*> b) const {
-                std::vector<Bus*> buses = b;
-
-                return { render_settings_, std::move(buses) };
+            MapView RenderMap(const std::vector<BusPtr> b) const {
+                std::vector<BusPtr> buses = b;
+                return { render_settings_, buses };
             }
         private:
             RenderSettings render_settings_;

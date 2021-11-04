@@ -73,28 +73,28 @@ namespace transport_catalogue::renderer {
 
     }  // namespace
 
-    MapView::MapView(RenderSettings render_settings, std::vector<Bus*> buses)
+    MapView::MapView(RenderSettings render_settings, std::vector<BusPtr> buses)
         : render_settings_(std::move(render_settings))
         , buses_(std::move(buses))  //
     {
-        std::sort(buses_.begin(), buses_.end(), [](Bus* lhs, Bus* rhs) {
+        std::sort(buses_.begin(), buses_.end(), [](BusPtr lhs, BusPtr rhs) {
             return lhs->B_name < rhs->B_name;
             });
 
-        std::unordered_set<Stop*> stops;
-        for (const Bus* bus : buses_) {
+        std::unordered_set<StopPtr> stops;
+        for (BusPtr bus : buses_) {
             stops.insert(bus->b_stops.begin(), bus->b_stops.end());
         }
 
         std::vector<distance::Coordinates> geo_coords;
         geo_coords.reserve(stops.size());
-        for (const Stop* stop : stops) {
+        for (StopPtr stop : stops) {
             geo_coords.push_back(stop->coordinates);
         }
 
         SphereProjector projector{ geo_coords.begin(), geo_coords.end(), render_settings_.max_width,
                                   render_settings_.max_height, render_settings_.padding };
-        for (const Stop* stop : stops) {
+        for (StopPtr stop : stops) {
             stops_coords_[stop] = projector(stop->coordinates);
         }
     }
@@ -108,7 +108,7 @@ namespace transport_catalogue::renderer {
     void MapView::DrawRoutes(svg::ObjectContainer& container) const {
         using namespace svg;
         size_t bus_index = 0;
-        for (const Bus* bus : buses_) {
+        for (BusPtr bus : buses_) {
             if (const auto& stops = bus->b_stops; !stops.empty()) {
                 Polyline line;
                 line.SetStrokeColor(GetBusLineColor(bus_index++))
@@ -117,7 +117,7 @@ namespace transport_catalogue::renderer {
                     .SetFillColor(NoneColor)
                     .SetStrokeLineJoin(StrokeLineJoin::ROUND);
 
-                for (const Stop* stop : stops) {
+                for (StopPtr stop : stops) {
                     line.AddPoint(stops_coords_.at(stop));
                 }
                 container.Add(std::move(line));
@@ -128,13 +128,13 @@ namespace transport_catalogue::renderer {
     void MapView::DrawRoutesNames(svg::ObjectContainer& container) const {
         using namespace svg;
         size_t bus_index = 0;
-        for (const Bus* bus : buses_) {
+        for (BusPtr bus : buses_) {
             if (bus->b_stops.empty()) {
                 continue;
             }
             const auto& bus_color = GetBusLineColor(bus_index++);
 
-            for (const Stop* endpoint : bus->end_points_) {
+            for (StopPtr endpoint : bus->end_points_) {
                 const auto& stop_coord = stops_coords_.at(endpoint);
 
                 const auto base_text =  //

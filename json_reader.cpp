@@ -2,7 +2,7 @@
 
 #include "request_handler.h"
 #include "transport_catalogue.h"
-
+#include "transport_router.h"
 #include <algorithm>
 #include <sstream>
 
@@ -152,17 +152,25 @@ namespace transport_catalogue::json_reader {
 
             json::Node Execute(const service::RequestHandler& handler, const int id_) const {
                 if (const auto buses = handler.GetBusesByStop(name)) {
-                    std::vector<Bus*> bus_vector{ buses->begin(), buses->end() };
-                    std::sort(bus_vector.begin(), bus_vector.end(), [](Bus* lhs, Bus* rhs) {
-                        return lhs->B_name < rhs->B_name;
-                        });
-                    json::Builder builder;
-                    builder.StartDict().Key("buses").StartArray();
-                    for (const auto& bus : bus_vector) {
-                        builder.Value(json::Node::Value{ bus->B_name });
+                    if (buses->size() == 0) {
+                        json::Builder builder;
+                        builder.StartDict().Key("buses").StartArray();
+                        builder.EndArray().Key("request_id").Value(json::Node::Value{ id_ }).EndDict();
+                        return builder.Build();
                     }
-                    builder.EndArray().Key("request_id").Value(json::Node::Value{ id_ }).EndDict();
-                    return builder.Build();
+                    else {
+                        std::vector<BusPtr> bus_vector{ buses->begin(), buses->end() };
+                        std::sort(bus_vector.begin(), bus_vector.end(), [](BusPtr lhs, BusPtr rhs) {
+                            return lhs->B_name < rhs->B_name;
+                            });
+                        json::Builder builder;
+                        builder.StartDict().Key("buses").StartArray();
+                        for (const auto& bus : bus_vector) {
+                            builder.Value(json::Node::Value{ bus->B_name });
+                        }
+                        builder.EndArray().Key("request_id").Value(json::Node::Value{ id_ }).EndDict();
+                        return builder.Build();
+                    }
                 }
                 else {
                     return json::Builder{}.StartDict().Key("error_message").Value("not found"s)
@@ -180,6 +188,44 @@ namespace transport_catalogue::json_reader {
             }
         };
 
+        struct RouteRequest {
+            std::string from;
+            std::string to;
+            json::Node Execute(const service::RequestHandler& handler, const int id_) const {
+                using namespace graph;
+                json::Builder builder;
+                builder.StartDict()
+                    .Key("request_id"s).Value(json::Node::Value{ id_ });
+                const auto& route_report = handler.GetReportRouter(from, to);
+                if (route_report) {
+                    builder.Key("total_time"s).Value(route_report->total_minutes)
+                        .Key("items"s).StartArray();
+                    for (const auto& info : route_report->information) {
+                        if (!info.wait.stop_name.empty()) {
+                            builder.StartDict()
+                                .Key("type"s).Value("Wait"s)
+                                .Key("time"s).Value(info.wait.minutes)
+                                .Key("stop_name"s).Value(info.wait.stop_name)
+                                .EndDict();
+                        }
+                        if (!info.bus.number.empty()) {
+                            builder.StartDict()
+                                .Key("type"s).Value("Bus"s)
+                                .Key("time"s).Value(info.bus.minutes)
+                                .Key("bus"s).Value(std::string(info.bus.number))
+                                .Key("span_count"s).Value(info.bus.span_count)
+                                .EndDict();
+                        }
+                    }
+                    builder.EndArray().EndDict();
+                }
+                else {
+                    builder.Key("error_message"s).Value("not found"s).EndDict();
+                }
+                return builder.Build();
+            }
+        };
+
         json::Node HandleRequest(const json::Dict& request_json, const service::RequestHandler& handler) {
             const std::string& type = request_json.at("type"s).AsString();
             if (type == "Bus"sv) {
@@ -194,6 +240,11 @@ namespace transport_catalogue::json_reader {
             }
             else if (type == "Map"sv) {
                 const auto request = MapRequest{};
+                auto response_json = request.Execute(handler, request_json.at("id"s).AsInt());
+                return response_json;
+            }
+            else if (type == "Route"sv) {
+                const auto request = RouteRequest{ request_json.at("from").AsString(), request_json.at("to").AsString() };
                 auto response_json = request.Execute(handler, request_json.at("id"s).AsInt());
                 return response_json;
             }
@@ -244,6 +295,11 @@ namespace transport_catalogue::json_reader {
 
         rs.bus_label_font_size = render_settings_json.at("bus_label_font_size").AsInt();
         rs.bus_label_offset = ReadPoint(render_settings_json.at("bus_label_offset").AsArray());
+    }
+
+    void ReadRoutingSettings(Settings& settings, const json::Dict& routing_settings_json) {
+        settings.bus_velocity = routing_settings_json.at("bus_velocity").AsDouble();
+        settings.bus_wait_time = routing_settings_json.at("bus_wait_time").AsInt();
     }
 
     json::Array HandleRequests(const json::Array& requests_json,
