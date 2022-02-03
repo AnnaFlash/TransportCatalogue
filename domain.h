@@ -17,6 +17,7 @@ namespace transport_catalogue {
 	{
 		std::string name = "";
 		distance::Coordinates coordinates = { 0, 0 };
+		bool free = true;
 	};
 
 	struct Bus {

@@ -10,43 +10,34 @@ using namespace std::literals;
  * Если запустить приложение с ключом --render-only,
  * приложение выведет в cout только SVG карту маршрутов
  */
+void PrintUsage(std::ostream& stream = std::cerr) {
+    stream << "Usage: transport_catalogue [make_base|process_requests]\n"sv;
+}
+
 
 int main(int argc, char* argv[]) {
-    using namespace transport_catalogue;
-    std::ifstream in("C:\\Users\\Анна\\Desktop\\test4.txt");
-    std::ofstream out("ans4.txt");
-    try {
-        transport_catalogue::TransportCatalogue db;
-        const auto json = json::Load(in).GetRoot().AsMap();
-
-        json_reader::ReadTransportCatalogue(db, json.at("base_requests"s).AsArray());
-
-        // В 1 части итогового проекта во входных данных отсутствует ключ render_settings
-        // В этом случае используем настройки по умолчанию
-        renderer::RenderSettings render_settings;
-        if (json.count("render_settings"s) != 0) {
-            json_reader::ReadRenderSettings(render_settings, json.at("render_settings"s).AsMap());
-        }
-        renderer::MapRenderer renderer{ std::move(render_settings) };
-        Settings route_settings;
-        if (json.count("routing_settings"s) != 0) {
-            json_reader::ReadRoutingSettings(route_settings, json.at("routing_settings"s).AsMap());
-        }
-        router::TransportRouter router(db, route_settings);
-
-        service::RequestHandler handler(db, renderer, router);
-
-        json::Array responses
-            = json_reader::HandleRequests(json.at("stat_requests"s).AsArray(), handler);
-
-        if (argc == 2 && argv[1] == "--render-only"sv) {
-            handler.RenderMap().Render(out);
-        }
-        else {
-            json::Print(json::Document(std::move(responses)), out);
-        }
+    if (argc != 2) {
+        PrintUsage();
+        return 1;
     }
-    catch (const std::exception& e) {
-        std::cerr << "Error: "sv << e.what() << std::endl;
+    const std::string_view mode(argv[1]);
+    transport_catalogue::TransportCatalogue base_data;
+    router::TransportRouter router(base_data);
+    renderer::MapRenderer map_renderer;
+    serialization::Serialization serializator(base_data, map_renderer, router);
+    service::RequestHandler request_handler(serializator, base_data, map_renderer, router);
+    reader::JsonReader json_reader(serializator, base_data, map_renderer, request_handler, router);
+    std::ofstream ofs("C://TransportCatalogue//myamswer33.json");
+    if (mode == "make_base"sv) {
+        json_reader.ReadBase();
     }
+    else if (mode == "process_requests"sv) {
+        json_reader.ReadRequests();
+        json_reader.Answer(ofs);
+    }
+    else {
+        PrintUsage();
+        return 1;
+    }
+    system("pause");
 }

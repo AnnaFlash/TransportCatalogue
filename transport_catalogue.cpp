@@ -156,3 +156,8 @@ StopInfo TransportCatalogue::GetStopInfo(const std::string_view stop) const noex
 	return StopInfo(si);
 }
 
+const StopsDistance& transport_catalogue::TransportCatalogue::GetStopsDistance() const
+{
+	return distance_between_stops_;
+}
+

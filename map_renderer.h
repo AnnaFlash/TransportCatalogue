@@ -4,10 +4,9 @@
 
 #include <cassert>
 #include <map>
-namespace transport_catalogue {
 
     namespace renderer {
-
+        using namespace transport_catalogue;
         struct RenderSettings {
             std::vector<svg::Color> palette;
             double max_width;
@@ -60,10 +59,11 @@ namespace transport_catalogue {
                 std::vector<BusPtr> buses = b;
                 return { render_settings_, buses };
             }
+            void SetRenderSettings(const RenderSettings& settings);
+            RenderSettings GetRenderSettings() const;
+
         private:
             RenderSettings render_settings_;
         };
 
     }  // namespace renderer
-
-}  // namespace transport_catalogue

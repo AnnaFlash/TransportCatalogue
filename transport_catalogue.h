@@ -32,6 +32,7 @@ namespace transport_catalogue {
 		{
 			return deq_buses_;
 		}
+		const StopsDistance& GetStopsDistance() const;
 	private:
 		std::vector<BusPtr> deq_buses_;
 		std::unordered_map<std::string_view, Stop> stops_;

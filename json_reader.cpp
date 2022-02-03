@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <sstream>
 
-namespace transport_catalogue::json_reader {
+namespace reader {
     struct Stop_to_Add {
         std::string name;
         double lat;
@@ -79,8 +79,6 @@ namespace transport_catalogue::json_reader {
             return req;
         }
 
-        // -------------
-
         uint8_t ReadByte(const json::Node& json) {
             int int_value = json.AsInt();
             uint8_t byte = static_cast<uint8_t>(int_value);
@@ -107,7 +105,7 @@ namespace transport_catalogue::json_reader {
             else if (json.IsNull()) {
                 return svg::NoneColor;
             }
-            throw InvalidRequestError("invalid color format");
+            throw  reader::InvalidRequestError("invalid color format");
         }
 
         svg::Point ReadPoint(const json::Array& json) {
@@ -159,8 +157,8 @@ namespace transport_catalogue::json_reader {
                         return builder.Build();
                     }
                     else {
-                        std::vector<BusPtr> bus_vector{ buses->begin(), buses->end() };
-                        std::sort(bus_vector.begin(), bus_vector.end(), [](BusPtr lhs, BusPtr rhs) {
+                        std::vector<transport_catalogue::BusPtr> bus_vector{ buses->begin(), buses->end() };
+                        std::sort(bus_vector.begin(), bus_vector.end(), [](transport_catalogue::BusPtr lhs, transport_catalogue::BusPtr rhs) {
                             return lhs->B_name < rhs->B_name;
                             });
                         json::Builder builder;
@@ -181,10 +179,11 @@ namespace transport_catalogue::json_reader {
 
         struct MapRequest {
             json::Node Execute(const service::RequestHandler& handler, const int id_) const {
-                std::ostringstream strm;
-                handler.RenderMap().Render(strm);
-                return json::Builder{}.StartDict().Key("map").Value(strm.str())
-                    .Key("request_id").Value(json::Node::Value{ id_ }).EndDict().Build();
+                json::Builder builder_node;
+                builder_node.StartDict()
+                    .Key("request_id"s).Value(id_);
+                builder_node.Key("map"s).Value(handler.RenderPrMap().description());
+                return builder_node.EndDict().Build();
             }
         };
 
@@ -214,13 +213,13 @@ namespace transport_catalogue::json_reader {
                                 .Key("time"s).Value(info.bus.minutes)
                                 .Key("bus"s).Value(std::string(info.bus.number))
                                 .Key("span_count"s).Value(info.bus.span_count)
-                                .EndDict();
+.EndDict();
                         }
                     }
                     builder.EndArray().EndDict();
                 }
                 else {
-                    builder.Key("error_message"s).Value("not found"s).EndDict();
+                builder.Key("error_message"s).Value("not found"s).EndDict();
                 }
                 return builder.Build();
             }
@@ -249,17 +248,22 @@ namespace transport_catalogue::json_reader {
                 return response_json;
             }
             else {
-                throw InvalidRequestError("Invalid request type "s + type);
+                throw reader::InvalidRequestError("Invalid request type "s + type);
             }
         }
 
     }  // namespace
 
-    void ReadTransportCatalogue(transport_catalogue::TransportCatalogue& catalogue, const json::Array& base_requests_json) {
+    void JsonReader::LoadRouter()
+    {
+        tr_.MakeGraph();
+    }
+
+    void JsonReader::ReadTransportCatalogue(){ //transport_catalogue::TransportCatalogue& catalogue, const json::Array& base_requests_json) {
         std::vector<detail::Bus_to_Add> buses;
         std::vector<detail::StopDistances> dist;
         std::vector<std::string> buses_names;
-        for (const auto& req_json : base_requests_json) {
+        for (const auto& req_json : base_requests_) {
             const auto& props_json = req_json.AsMap();
             const std::string& type = props_json.at("type"s).AsString();
             if (type == "Bus"sv) {
@@ -267,17 +271,19 @@ namespace transport_catalogue::json_reader {
             }
             else if (type == "Stop"sv) {
                 Stop_to_Add s = ParsingStops(dist, props_json);
-                catalogue.AddStop(s.name, s.lat, s.longt);
+                tc_.AddStop(s.name, s.lat, s.longt);
             }
             else {
-                throw InvalidRequestError("Invalid type");
+                throw reader::InvalidRequestError("Invalid type");
             }
         }
-        AddingBuses(catalogue, buses);
-        AddingDistances(catalogue, std::move(dist), std::move(buses_names));
+        AddingBuses(tc_, buses);
+        AddingDistances(tc_, std::move(dist), std::move(buses_names));
     }
 
-    void ReadRenderSettings(renderer::RenderSettings& rs, const json::Dict& render_settings_json) {
+    renderer::RenderSettings JsonReader::ReadRenderSettings(const json::Dict& render_settings_json) const
+    {
+        renderer::RenderSettings rs;
         rs.palette = ReadColors(render_settings_json.at("color_palette"s).AsArray());
 
         rs.underlayer_width = render_settings_json.at("underlayer_width"s).AsDouble();
@@ -295,11 +301,7 @@ namespace transport_catalogue::json_reader {
 
         rs.bus_label_font_size = render_settings_json.at("bus_label_font_size").AsInt();
         rs.bus_label_offset = ReadPoint(render_settings_json.at("bus_label_offset").AsArray());
-    }
-
-    void ReadRoutingSettings(Settings& settings, const json::Dict& routing_settings_json) {
-        settings.bus_velocity = routing_settings_json.at("bus_velocity").AsDouble();
-        settings.bus_wait_time = routing_settings_json.at("bus_wait_time").AsInt();
+        return rs;
     }
 
     json::Array HandleRequests(const json::Array& requests_json,
@@ -312,4 +314,58 @@ namespace transport_catalogue::json_reader {
         return responses_json;
     }
 
-}  // namespace transport_catalogue::json_reader
+    JsonReader::JsonReader(serialization::Serialization& ser, transport_catalogue::TransportCatalogue& tc,
+        renderer::MapRenderer& map_ren, service::RequestHandler& req_hand, router::TransportRouter& tr) : 
+        ser_(ser), tc_(tc), 
+        map_ren_(map_ren), req_hand_(req_hand), tr_(tr)
+    {}
+
+    void JsonReader::ReadBase(std::istream & in)
+    {
+        const auto load = json::Load(in).GetRoot().AsMap();
+        base_requests_ = load.at("base_requests"s).AsArray();
+        if (load.count("serialization_settings"s)) {
+            ser_.SetSetting(ReadSerializationSetting(load.at("serialization_settings"s).AsMap()));
+        }
+        if (load.count("render_settings")) {
+            map_ren_.SetRenderSettings(ReadRenderSettings(load.at("render_settings").AsMap()));
+        }
+        if (load.count("routing_settings"s)) {
+            tr_.SetSettings(ReadRouterSettings(load.at("routing_settings"s).AsMap()));
+        }
+        ReadTransportCatalogue();
+        ser_.CreateBase();
+    }
+
+    void JsonReader::ReadRequests(std::istream& in)
+    {
+        const auto load = json::Load(in).GetRoot().AsMap();
+        stat_request_ = load.at("stat_requests").AsArray();
+        ser_.SetSetting(ReadSerializationSetting(load.at("serialization_settings"s).AsMap()));
+        ser_.AccessBase();
+        LoadRouter();
+        
+    }
+
+    void JsonReader::Answer(std::ostream& out)
+    {
+        json::Array responses_json;
+        responses_json.reserve(stat_request_.size());
+        for (const json::Node& request_json : stat_request_) {
+            responses_json.emplace_back(HandleRequest(request_json.AsMap(), req_hand_));
+        }
+        const json::Document report(responses_json);
+        Print(report, out);
+    }
+
+    Settings JsonReader::ReadRouterSettings(const json::Dict& description) const
+    {
+        return { description.at("bus_wait_time"s).AsInt(),
+                  description.at("bus_velocity"s).AsDouble() };
+    }
+
+    JsonReader::Path JsonReader::ReadSerializationSetting(const json::Dict& description) const
+    {
+        return Path(description.at("file"s).AsString());
+    }
+}  // namespace reader

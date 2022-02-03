@@ -3,10 +3,10 @@
 #include <algorithm>
 #include <unordered_set>
 
-namespace transport_catalogue::renderer {
+namespace renderer {
 
     using namespace std::literals;
-
+    using namespace transport_catalogue;
     namespace {
 
         constexpr double EPSILON = 1e-6;
@@ -200,5 +200,11 @@ namespace transport_catalogue::renderer {
     MapRenderer::MapRenderer(RenderSettings settings)
         : render_settings_(std::move(settings)) {
     }
+    void MapRenderer::SetRenderSettings(const RenderSettings& settings) {
+        render_settings_ = settings;
+    }
 
+    RenderSettings MapRenderer::GetRenderSettings() const {
+        return render_settings_;
+    }
 }  // namespace transport_catalogue::renderer
